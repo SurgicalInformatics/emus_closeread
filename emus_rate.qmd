@@ -1,0 +1,294 @@
+---
+title: "EMUs Stage 3 Recruitment progress"
+format: 
+  closeread-html:
+    theme: cosmo
+    cr-style:
+      narrative-background-color-sidebar: "#f55845"
+      section-background-color: white
+      narrative-text-color-sidebar: black
+      narrative-font-size: 2em
+editor: visual
+execute:
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+theme: minty
+knitr:
+  opts_chunk:
+    out.width: "8in"
+---
+
+```{r}
+library(tidyverse)
+library(scales)
+library(tidymodels)
+theme_set(theme_classic(base_size = 16))
+library(pins)
+board_local = board_folder("/home/common/emus/")
+emus_patients = board_local %>% pin_read("emus_recruitment")
+
+emus_colours = c("#d73027", "#fdae61", "#66bd63")
+```
+
+```{r}
+weekly_recruitment = emus_patients %>% 
+  count(week) %>% 
+  mutate(total = cumsum(n))
+
+study_dates = tibble(week = ymd("2024-08-05") + weeks(1:100)) %>% 
+  filter(week < ymd("2026-01-01"))
+
+# base R + broom
+#lm(total~week, data = weekly_recruitment) %>% augment(newdata = future)
+
+# tidymodels workflow for linear regression
+recruitment_lm       = linear_reg()
+recruitment_recipe   = recipe(total~week, data = weekly_recruitment)
+recruitment_workflow = workflow() %>% 
+  add_recipe(recruitment_recipe) %>% 
+  add_model(recruitment_lm)
+
+filter_sets = function(df, set = c("thisyear", "fourweeks")){
+  if (set == "thisyear"){
+    df %>% 
+      filter(week > ymd("2024-12-31"))
+  } else if(set == "fourweeks"){
+    df %>% 
+      filter(week > (today() - weeks(4)))
+  } else{
+    df
+  }
+}
+
+lm_all       = fit(recruitment_workflow,             weekly_recruitment)
+lm_thisyear  = fit(recruitment_workflow, filter_sets(weekly_recruitment, "thisyear"))
+lm_fourweeks = fit(recruitment_workflow, filter_sets(weekly_recruitment, "fourweeks"))
+
+pred_all       = augment(lm_all,                   study_dates)               %>% mutate(pred_length = "Whole study")
+total_all = max(pull(pred_all, .pred)) %>% floor()
+pred_thisyear  = augment(lm_thisyear,  filter_sets(study_dates, "thisyear"))  %>% mutate(pred_length = "From Jan'25")
+total_thisyear = max(pull(pred_thisyear, .pred)) %>% floor()
+pred_fourweeks = augment(lm_fourweeks, filter_sets(study_dates, "fourweeks")) %>% mutate(pred_length = "Last 4 weeks")
+total_fourweeks = max(pull(pred_fourweeks, .pred)) %>% floor()
+
+predictions = bind_rows(pred_all, pred_thisyear) %>% 
+  bind_rows(pred_fourweeks) %>% 
+  mutate(total = floor(.pred)) %>% 
+  mutate(pred_length = fct_relevel(pred_length, "Whole study"))
+```
+
+::::{.cr-section}
+
+Recruitment commenced in August 2024 and will continue until the end of 2025. @cr-plot1
+
+:::{#cr-plot1}
+
+```{r}
+plot1 = weekly_recruitment %>% 
+  ggplot(aes(week, total)) +
+  geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
+  geom_point() +
+  scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
+  # geom_label(data = predictions %>% 
+  #              group_by(pred_length) %>% 
+  #              slice_max(total) %>% 
+  #              filter(pred_length == "Whole study"),
+  #            aes(label = total), size = 7)   +
+  scale_color_manual("Scenario", values = emus_colours) +
+  scale_alpha_manual(values = c(0, 0, 0), guide = "none") +
+  guides(color = guide_legend(reverse=TRUE)) +
+  theme(legend.position = "none",
+        legend.position.inside = c(0.1, 0.8),
+        plot.margin = margin(0.2, 0.8, 0.2, 0.2, "cm")
+  ) +
+  labs(y = "Number of patients",
+       x = "")
+
+plot1
+```
+
+:::
+
+If we recruited with the average rate that we've had since the beginning of the study, we would finish the study with just `r total_all` patients.  @cr-plot2
+
+:::{#cr-plot2}
+
+```{r}
+
+arrows <- 
+  tibble(
+    x1 = c(ymd("2025-07-05")),
+    x2 = c(ymd("2025-11-25")),
+    y1 = 800, 
+    y2 = 500
+  )
+
+
+plot2 = weekly_recruitment %>% 
+  ggplot(aes(week, total)) +
+  geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
+  geom_point() +
+  scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
+  geom_label(data = predictions %>% 
+               group_by(pred_length) %>% 
+               slice_max(total) %>% 
+               filter(pred_length == "Whole study"),
+             aes(label = total), size = 7)   +
+  scale_color_manual("Scenario", values = emus_colours) +
+  scale_alpha_manual(values = c(0.8, 0, 0), guide = "none") +
+  guides(color = guide_legend(reverse=TRUE)) +
+  theme(legend.position = "none",
+        legend.position.inside = c(0.1, 0.8),
+        plot.margin = margin(0.2, 0.8, 0.2, 0.2, "cm")
+  ) +
+  labs(y = "Number of patients",
+       x = "") +
+  annotate("text", x = ymd("2025-06-01"), y = 875, 
+           label = "Number of patients based on \n all time recruitment rate") +
+  geom_curve(
+    data = arrows, aes(x = x1, y = y1, xend = x2, yend = y2),
+    arrow = arrow(length = unit(0.08, "inch")), linewidth = 0.5,
+    color = "gray20", curvature = 0.3)
+
+plot2
+
+```
+:::
+
+
+However, as more sites are being opened, our recruitment rate is accelerating.  @cr-plot3
+
+:::{#cr-plot3}
+
+```{r}
+
+arrows <- 
+  tibble(
+    x1 = c(ymd("2025-07-05")),
+    x2 = c(ymd("2025-11-25")),
+    y1 = 1000, 
+    y2 = 900
+  )
+
+
+plot3 = weekly_recruitment %>% 
+  ggplot(aes(week, total)) +
+  geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
+  geom_point() +
+  scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
+  geom_label(data = predictions %>% 
+               group_by(pred_length) %>% 
+               slice_max(total) %>% 
+               filter(pred_length != "Last 4 weeks"),
+             aes(label = total), size = 7)   +
+  scale_color_manual("Scenario", values = emus_colours) +
+  scale_alpha_manual(values = c(0.1, 0.9, 0), guide = "none") +
+  guides(color = guide_legend(reverse=TRUE)) +
+  theme(legend.position = "none",
+        legend.position.inside = c(0.1, 0.8),
+        plot.margin = margin(0.2, 0.8, 0.2, 0.2, "cm")
+  ) +
+  labs(y = "Number of patients",
+       x = "") +
+  annotate("text", x = ymd("2025-06-01"), y = 1100, 
+           label = "Number of patients based on \n Jan-Mar 2025 recruitment rate") +
+  geom_curve(
+    data = arrows, aes(x = x1, y = y1, xend = x2, yend = y2),
+    arrow = arrow(length = unit(0.08, "inch")), linewidth = 0.5,
+    color = "gray20", curvature = 0.3)
+
+plot3
+
+```
+:::
+
+If we continue recruiting patients with the same rate we have over the last four weeks, we will finish the study with `r total_fourweeks` patients.  @cr-plot4
+
+:::{#cr-plot4}
+
+```{r}
+
+arrows <- 
+  tibble(
+    x1 = c(ymd("2025-07-05")),
+    x2 = c(ymd("2025-11-20")),
+    y1 = 1200, 
+    y2 = 1250
+  )
+
+
+plot4 = weekly_recruitment %>% 
+  ggplot(aes(week, total)) +
+  geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
+  geom_point() +
+  scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
+  geom_label(data = predictions %>% 
+               group_by(pred_length) %>% 
+               slice_max(total),
+             aes(label = total), size = 7)   +
+  scale_color_manual("Scenario", values = emus_colours) +
+  scale_alpha_manual(values = c(0.1, 0.1, 0.9), guide = "none") +
+  guides(color = guide_legend(reverse=TRUE)) +
+  theme(legend.position = "none",
+        legend.position.inside = c(0.1, 0.8),
+        plot.margin = margin(0.2, 0.8, 0.2, 0.2, "cm")
+  ) +
+  labs(y = "Number of patients",
+       x = "") +
+  annotate("text", x = ymd("2025-04-01"), y = 1200, 
+           label = "Number of patients based on \n last four weeks' recruitment rate") +
+  geom_curve(
+    data = arrows, aes(x = x1, y = y1, xend = x2, yend = y2),
+    arrow = arrow(length = unit(0.08, "inch")), linewidth = 0.5,
+    color = "gray20", curvature = 0.1)
+
+plot4
+
+```
+:::
+
+
+Our three recruitment scenarios based on the different rates. @cr-plot5
+
+:::{#cr-plot5}
+
+
+```{r}
+plot_final = weekly_recruitment %>% 
+  ggplot(aes(week, total)) +
+  geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
+  geom_point() +
+  scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
+  geom_label(data = predictions %>% 
+               group_by(pred_length) %>% 
+               slice_max(total),
+             aes(label = total), size = 7)   +
+  scale_color_manual("Scenario", values = emus_colours) +
+  scale_alpha_manual(values = c(0.8, 0.9, 0.9), guide = "none") +
+  guides(color = guide_legend(reverse=TRUE)) +
+  theme(legend.position = "inside",
+        legend.position.inside = c(0.2, 0.8),
+        plot.margin = margin(0.2, 0.8, 0.2, 0.2, "cm")
+  ) +
+  labs(y = "Number of patients",
+       x = "")
+
+
+plot_final
+```
+
+
+
+:::
