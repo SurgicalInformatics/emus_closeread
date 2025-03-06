@@ -5,3 +5,7 @@
 *html
 *_files
 rsconnect
+*.rda
+*.rds
+*.csv
+*.pptx

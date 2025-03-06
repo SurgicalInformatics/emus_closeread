@@ -1,0 +1,45 @@
+---
+title: "EMUs recruitment rates"
+format: pptx
+execute:
+  echo: false
+  warning: false
+knitr:
+  opts_chunk:
+    out.width: "8in"
+---
+
+Scrolly version is at: [https://argoshare.is.ed.ac.uk/emus_rate/](https://argoshare.is.ed.ac.uk/emus_rate/)
+
+--- 
+
+```{r}
+library(tidyverse)
+theme_set(theme_classic(base_size = 16))
+load("plots_for_powerpoint.rda")
+plot1
+```
+
+---
+
+```{r}
+plot2
+```
+
+---
+
+```{r}
+plot3
+```
+
+---
+
+```{r}
+plot4
+```
+
+---
+
+```{r}
+plot_final
+```

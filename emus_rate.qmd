@@ -1,6 +1,7 @@
 ---
 title: "EMUs Stage 3 Recruitment progress"
 format: 
+  pptx: default
   closeread-html:
     theme: cosmo
     cr-style:
@@ -8,7 +9,6 @@ format:
       section-background-color: white
       narrative-text-color-sidebar: black
       narrative-font-size: 2em
-editor: visual
 execute:
   echo: false
   warning: false
@@ -289,6 +289,9 @@ plot_final = weekly_recruitment %>%
 plot_final
 ```
 
-
-
 :::
+
+```{r}
+save(plot1, plot2, plot3, plot4, plot_final, file = "plots_for_powerpoint.rda")
+```
+
