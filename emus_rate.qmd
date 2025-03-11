@@ -1,7 +1,6 @@
 ---
 title: "EMUs Stage 3 Recruitment progress"
 format: 
-  pptx: default
   closeread-html:
     theme: cosmo
     cr-style:
@@ -50,13 +49,13 @@ recruitment_workflow = workflow() %>%
   add_recipe(recruitment_recipe) %>% 
   add_model(recruitment_lm)
 
-filter_sets = function(df, set = c("thisyear", "fourweeks")){
+filter_sets = function(df, set = c("thisyear", "sixweeks")){
   if (set == "thisyear"){
     df %>% 
       filter(week > ymd("2024-12-31"))
-  } else if(set == "fourweeks"){
+  } else if(set == "sixweeks"){
     df %>% 
-      filter(week > (today() - weeks(4)))
+      filter(week > (today() - weeks(6)))
   } else{
     df
   }
@@ -64,17 +63,19 @@ filter_sets = function(df, set = c("thisyear", "fourweeks")){
 
 lm_all       = fit(recruitment_workflow,             weekly_recruitment)
 lm_thisyear  = fit(recruitment_workflow, filter_sets(weekly_recruitment, "thisyear"))
-lm_fourweeks = fit(recruitment_workflow, filter_sets(weekly_recruitment, "fourweeks"))
+lm_sixweeks = fit(recruitment_workflow, filter_sets(weekly_recruitment, "sixweeks"))
+
+
 
 pred_all       = augment(lm_all,                   study_dates)               %>% mutate(pred_length = "Whole study")
 total_all = max(pull(pred_all, .pred)) %>% floor()
 pred_thisyear  = augment(lm_thisyear,  filter_sets(study_dates, "thisyear"))  %>% mutate(pred_length = "From Jan'25")
 total_thisyear = max(pull(pred_thisyear, .pred)) %>% floor()
-pred_fourweeks = augment(lm_fourweeks, filter_sets(study_dates, "fourweeks")) %>% mutate(pred_length = "Last 4 weeks")
-total_fourweeks = max(pull(pred_fourweeks, .pred)) %>% floor()
+pred_sixweeks = augment(lm_sixweeks, filter_sets(study_dates, "sixweeks")) %>% mutate(pred_length = "Last 6 weeks")
+total_sixweeks = max(pull(pred_sixweeks, .pred)) %>% floor()
 
 predictions = bind_rows(pred_all, pred_thisyear) %>% 
-  bind_rows(pred_fourweeks) %>% 
+  bind_rows(pred_sixweeks) %>% 
   mutate(total = floor(.pred)) %>% 
   mutate(pred_length = fct_relevel(pred_length, "Whole study"))
 ```
@@ -91,7 +92,7 @@ plot1 = weekly_recruitment %>%
   geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
   geom_point() +
   scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
-  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_y_continuous(limits = c(0, 1200), expand = c(0.1, 0.1)) +
   geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
   # geom_label(data = predictions %>% 
   #              group_by(pred_length) %>% 
@@ -133,7 +134,7 @@ plot2 = weekly_recruitment %>%
   geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
   geom_point() +
   scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
-  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_y_continuous(limits = c(0, 1300), expand = c(0.1, 0.1)) +
   geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
   geom_label(data = predictions %>% 
                group_by(pred_length) %>% 
@@ -182,12 +183,12 @@ plot3 = weekly_recruitment %>%
   geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
   geom_point() +
   scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
-  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_y_continuous(limits = c(0, 1300), expand = c(0.1, 0.1)) +
   geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
   geom_label(data = predictions %>% 
                group_by(pred_length) %>% 
                slice_max(total) %>% 
-               filter(pred_length != "Last 4 weeks"),
+               filter(pred_length != "Last 6 weeks"),
              aes(label = total), size = 7)   +
   scale_color_manual("Scenario", values = emus_colours) +
   scale_alpha_manual(values = c(0.1, 0.9, 0), guide = "none") +
@@ -210,7 +211,7 @@ plot3
 ```
 :::
 
-If we continue recruiting patients with the same rate we have over the last four weeks, we will finish the study with `r total_fourweeks` patients.  @cr-plot4
+If we continue recruiting patients with the same rate we have over the last six weeks, we will finish the study with `r total_sixweeks` patients.  @cr-plot4
 
 :::{#cr-plot4}
 
@@ -218,10 +219,10 @@ If we continue recruiting patients with the same rate we have over the last four
 
 arrows <- 
   tibble(
-    x1 = c(ymd("2025-07-05")),
-    x2 = c(ymd("2025-11-20")),
-    y1 = 1200, 
-    y2 = 1250
+    x1 = c(ymd("2025-06-05")),
+    x2 = c(ymd("2025-10-31")),
+    y1 = 1100, 
+    y2 = 1150
   )
 
 
@@ -230,7 +231,7 @@ plot4 = weekly_recruitment %>%
   geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
   geom_point() +
   scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
-  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_y_continuous(limits = c(0, 1300), expand = c(0.1, 0.1)) +
   geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
   geom_label(data = predictions %>% 
                group_by(pred_length) %>% 
@@ -246,11 +247,11 @@ plot4 = weekly_recruitment %>%
   labs(y = "Number of patients",
        x = "") +
   annotate("text", x = ymd("2025-04-01"), y = 1200, 
-           label = "Number of patients based on \n last four weeks' recruitment rate") +
+           label = "Number of patients based on \n last six weeks' recruitment rate") +
   geom_curve(
     data = arrows, aes(x = x1, y = y1, xend = x2, yend = y2),
     arrow = arrow(length = unit(0.08, "inch")), linewidth = 0.5,
-    color = "gray20", curvature = 0.1)
+    color = "gray20", curvature = 0.13)
 
 plot4
 
@@ -269,7 +270,7 @@ plot_final = weekly_recruitment %>%
   geom_line(data = predictions, aes(colour = pred_length, alpha = pred_length), linewidth = 2) +
   geom_point() +
   scale_x_date(breaks = "2 months", date_labels = "%b'%y", expand = c(0.1, 0.1)) +
-  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_y_continuous(limits = c(0, 1300), expand = c(0.1, 0.1)) +
   geom_label(data = slice_max(weekly_recruitment, total), aes(label = total), size = 7) +
   geom_label(data = predictions %>% 
                group_by(pred_length) %>% 
