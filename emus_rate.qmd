@@ -1,5 +1,6 @@
 ---
 title: "EMUs Stage 3 Recruitment progress"
+date: today
 format: 
   closeread-html:
     theme: cosmo
@@ -286,13 +287,12 @@ plot_final = weekly_recruitment %>%
   labs(y = "Number of patients",
        x = "")
 
-
 plot_final
 ```
 
 :::
 
 ```{r}
-save(plot1, plot2, plot3, plot4, plot_final, file = "plots_for_powerpoint.rda")
+#save(plot1, plot2, plot3, plot4, plot_final, file = "plots_for_powerpoint.rda")
 ```
 
